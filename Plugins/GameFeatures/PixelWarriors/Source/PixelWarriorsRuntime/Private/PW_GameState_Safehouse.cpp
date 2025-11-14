@@ -1,39 +1,29 @@
-// PW_GameState_Safehouse.h
 // Copyright Pixel Warriors Inc. 2025
-#pragma once
+#include "PW_GameState_Safehouse.h"
+#include "Net/UnrealNetwork.h"
 
-#include "CoreMinimal.h"
-#include "ModularGameState.h"
-#include "PW_GameState_Safehouse.generated.h"
+APW_GameState_Safehouse::APW_GameState_Safehouse() { /* Defaults */ }
 
-// Delegate type (add if not already in another header)
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMatchStateChangedDelegate, FName, NewState, FName, OldState);
-
-UCLASS()
-class PIXELWARRIORSRUNTIME_API APW_GameState_Safehouse : public AModularGameState
+void APW_GameState_Safehouse::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const 
 {
-	GENERATED_BODY()
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(APW_GameState_Safehouse, Team_0_Money);
+	DOREPLIFETIME(APW_GameState_Safehouse, Team_1_Money);
+}
 
-public:
-	APW_GameState_Safehouse();
+// THIS IS THE CORRECTED LOGIC. We do not need PreviousMatchState. GetMatchState() is the truth.
+void APW_GameState_Safehouse::OnMatchStateSet()
+{
+	Super::OnMatchStateSet();
+	// The bell is rung with the one and only piece of information we need: the NEW state.
+	OnMatchStateChanged.Broadcast(GetMatchState());
+}
 
-	// Override to broadcast delegate
-	virtual void OnMatchStateSet();
-
-	// Delegate for match state changes
-	UPROPERTY(BlueprintAssignable, Category = "Events")
-	FOnMatchStateChangedDelegate OnMatchStateChanged;
-
-	// Your existing members
-	UPROPERTY(Replicated, BlueprintReadOnly)
-	int32 Team_0_Money = 0;
-
-	UPROPERTY(Replicated, BlueprintReadOnly)
-	int32 Team_1_Money = 0;
-
-	UFUNCTION(Server, Reliable)
-	void AddMoneyToTeam(uint8 TeamID, int32 Amount);
-
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_SafeRaided(uint8 TeamID);
-};
+void APW_GameState_Safehouse::AddMoneyToTeam(int32 TeamID, int32 Amount)
+{
+	if (HasAuthority() && Amount > 0)
+	{
+		if (TeamID == 0) { Team_0_Money += Amount; }
+		else if (TeamID == 1) { Team_1_Money += Amount; }
+	}
+}
